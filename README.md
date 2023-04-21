@@ -1,7 +1,15 @@
 # Private Repo Badge
 
-poc
+Demo for automatically updating badges that will work in private repos. 
 
-<img src="https://gist.githubusercontent.com/RoryQ/ff5db6cf182b5da7a378264067614756/raw/cbf9311fb29fae22bfa1c65faf77bfe063460abd/badge.svg"/>
+The github action will 
+1. Look for the column `Latest Tag` then find the latest semver tag that matches the decoded filename.
+2. For each tag a png badge will be generated then uploaded to the configured github release. 
 
 
+| Package                              | Latest Tag                                                                                                    |
+|--------------------------------------|---------------------------------------------------------------------------------------------------------------|
+| [json2yaml](./json2yaml)             | <img src="https://github.com/RoryQ/private-repo-badge/releases/download/readmebadges/json2yaml.png" />        |
+| [yaml2json](./yaml2json)             | <img src="https://github.com/RoryQ/private-repo-badge/releases/download/readmebadges/yaml2json.png" />        |
+| [tools/json2yaml](./tools/json2yaml) | <img src="https://github.com/RoryQ/private-repo-badge/releases/download/readmebadges/tools__json2yaml.png" /> |
+| [tools/yaml2json](./tools/yaml2json) | <img src="https://github.com/RoryQ/private-repo-badge/releases/download/readmebadges/tools__yaml2json.png" /> |
