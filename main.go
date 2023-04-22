@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"hash/fnv"
 	"io"
@@ -14,17 +15,68 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/google/go-github/v52/github"
 	"github.com/lucasb-eyer/go-colorful"
+	"golang.org/x/oauth2"
 )
 
 const (
 	// This release tag will receive pngs for each tag discovered in the readme table.
 	badgesReleaseTag = "readmebadges"
 	parentModPath    = "github.com/RoryQ/private-repo-badge"
+	owner            = "RoryQ"
+	repo             = "private-repo-badge"
 )
 
 func main() {
+	tags := latestVersionTags()
 
+	ctx := context.Background()
+	gh := githubClient(ctx)
+	release, _, err := gh.Repositories.GetReleaseByTag(ctx, owner, repo, badgesReleaseTag)
+	if err != nil {
+		panic(err)
+	}
+
+	for _, tag := range tags {
+		file := saveBadge(tag)
+		uploadBadgeToRelease(ctx, gh, release, file)
+	}
+}
+
+func githubClient(ctx context.Context) *github.Client {
+	ts := oauth2.StaticTokenSource(
+		&oauth2.Token{AccessToken: os.Getenv("GITHUB_TOKEN")},
+	)
+	tc := oauth2.NewClient(ctx, ts)
+
+	return github.NewClient(tc)
+}
+
+func uploadBadgeToRelease(ctx context.Context, gh *github.Client, release *github.RepositoryRelease, file *os.File) {
+	findAsset := func() *github.ReleaseAsset {
+		for _, asset := range release.Assets {
+			if asset.GetName() == file.Name() {
+				return asset
+			}
+		}
+		return nil
+	}
+
+	if existing := findAsset(); existing != nil {
+		_, err := gh.Repositories.DeleteReleaseAsset(ctx, owner, repo, existing.GetID())
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	_, _, err := gh.Repositories.UploadReleaseAsset(ctx, owner, repo, release.GetID(), &github.UploadOptions{Name: file.Name()}, file)
+	if err != nil {
+		panic(err)
+	}
+}
+
+func latestVersionTags() []string {
 	out, err := exec.Command("git", "tag").Output()
 	if err != nil {
 		panic(err)
@@ -41,6 +93,7 @@ func main() {
 
 	tablePrefixes := tagPrefixesFromTable(table)
 
+	latestVersions := []string{}
 	for _, prefix := range tablePrefixes {
 		latest, ok := tags[prefix]
 		if !ok {
@@ -49,9 +102,9 @@ func main() {
 
 		sortVersions(latest)
 
-		_ = saveBadge(latest[0])
-
+		latestVersions = append(latestVersions, latest[0])
 	}
+	return latestVersions
 }
 
 func saveBadge(latestTag string) *os.File {
@@ -66,7 +119,10 @@ func saveBadge(latestTag string) *os.File {
 	if err != nil {
 		panic(err.Error())
 	}
-	file.Seek(0, 0)
+	_, err = file.Seek(0, 0)
+	if err != nil {
+		panic(err.Error())
+	}
 	return file
 }
 
@@ -75,7 +131,7 @@ func getBadge(latestTag string) []byte {
 	colour := getColor(parentModPath + name)
 
 	hex := strings.TrimPrefix(colour.Hex(), "#")
-	imgUrl := fmt.Sprintf("https://raster.shields.io/badge/%s-%s-%s", name, version, hex)
+	imgUrl := fmt.Sprintf("https://raster.shields.io/badge/%s-%s-%s?labelColor=informational&style=flat-square", version, name, hex)
 
 	println(imgUrl)
 
